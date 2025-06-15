@@ -22,6 +22,12 @@ for archivo in archivos:
 
 df = pd.concat(lista_dfs, ignore_index=True)
 
+# Analisis preliminar de clientes
+conteo_tamano = df.groupby("Tamaño de Cliente")["ID Cliente"].nunique().reset_index()
+conteo_tamano.columns = ["Tamaño de Cliente", "Número de Clientes"]
+
+print(conteo_tamano)
+
 # Confirmar que todo se cargó correctamente
 print(f"{len(archivos)} archivos combinados. Total de registros: {len(df)}")
 for archivo in archivos:
@@ -72,6 +78,18 @@ plt.show()
 kmeans = KMeans(n_clusters=k_optimo, random_state=42, n_init="auto")
 df_clientes['Cluster'] = kmeans.fit_predict(X)
 
+# MERGE para saber a qué cluster pertenece cada fila de compra original
+productos_por_cluster = df.merge(df_clientes[['ID Cliente', 'Cluster']], on='ID Cliente')
+
+# TOP productos por cluster en términos de cajas vendidas
+top_productos = productos_por_cluster.groupby(['Cluster', 'Producto'])['Venta Cajas'].sum().reset_index()
+top_productos = top_productos.sort_values(['Cluster', 'Venta Cajas'], ascending=[True, False])
+
+# Mostrar los 5 productos más vendidos por cluster como ejemplo
+for cl in sorted(top_productos['Cluster'].unique()):
+    print(f"\nTop productos del Cluster {cl}:")
+    print(top_productos[top_productos['Cluster'] == cl].head(5))
+
 # Resumen por cluster
 cluster_summary = df_clientes.groupby('Cluster')[[
     'Total Ventas USD', 'Total Cajas', 'Productos Diferentes',
@@ -90,3 +108,5 @@ print(cluster_summary)
 guardar_csv = True  # Cambiar a False si no se desea guardar
 if guardar_csv:
     cluster_summary.to_csv("resumen_clustersTotal.csv")
+
+
