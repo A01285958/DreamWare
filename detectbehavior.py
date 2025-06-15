@@ -4,10 +4,28 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from kneed import KneeLocator
+import glob
+import os
 
-# Cargar el archivo CSV
-csv_path = "./Data/Venta 2022 OCT - DIC V3.csv"
-df = pd.read_csv(csv_path, encoding="latin1")
+# Ruta a la carpeta donde están todos los archivos CSV
+ruta_carpeta = "./Data/"
+
+# Buscar todos los archivos CSV en la carpeta
+archivos = glob.glob(os.path.join(ruta_carpeta, "*.csv"))
+
+# Leer y concatenar todos los archivos, agregando el nombre del archivo como columna "Origen"
+lista_dfs = []
+for archivo in archivos:
+    temp_df = pd.read_csv(archivo, encoding="latin1")
+    temp_df["Origen"] = os.path.basename(archivo)  # Agrega columna con el nombre del archivo
+    lista_dfs.append(temp_df)
+
+df = pd.concat(lista_dfs, ignore_index=True)
+
+# Confirmar que todo se cargó correctamente
+print(f"{len(archivos)} archivos combinados. Total de registros: {len(df)}")
+for archivo in archivos:
+    print(df.head())
 
 # Agrupar por cliente con métricas relevantes
 df_clientes = df.groupby('ID Cliente').agg({
@@ -70,6 +88,5 @@ print(cluster_summary)
 
 # Guardar archivos opcionalmente
 guardar_csv = True  # Cambiar a False si no se desea guardar
-# csv_path = "./Data/1. Ventas 2023 ENE/"
 if guardar_csv:
-    cluster_summary.to_csv(csv_path + " resumen_clusters.csv")
+    cluster_summary.to_csv("resumen_clustersTotal.csv")
