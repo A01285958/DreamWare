@@ -2,12 +2,14 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+import matplotlib.pyplot as plt
 
-# Cargar el archivo CSV
-csv_path = "./Data/1. Ventas 2022 ENE-MAR.csv"  # Parameterize the file path here
+# Cargar archivo
+csv_path = "./Data/1. Ventas 2022 ENE-MAR.csv"
 df = pd.read_csv(csv_path, encoding="latin1")
 
-# Agrupar por cliente con métricas relevantes
+# Agrupar por cliente
 df_clientes = df.groupby('ID Cliente').agg({
     'Venta USD': 'sum',
     'Venta Cajas': 'sum',
@@ -16,38 +18,52 @@ df_clientes = df.groupby('ID Cliente').agg({
     'Mes': 'nunique'
 }).reset_index()
 
-# Renombrar columnas para claridad
+# Renombrar columnas
 df_clientes.columns = ['ID Cliente', 'Total Ventas USD', 'Total Cajas',
                        'Productos Diferentes', 'Categorías Diferentes', 'Meses Diferentes']
 
-# Normalizar las columnas numéricas
+# Normalizar
 features = df_clientes.drop('ID Cliente', axis=1)
 scaler = StandardScaler()
 X = scaler.fit_transform(features)
 
-# Aplicar modelo de clustering KMeans
-kmeans = KMeans(n_clusters=4, random_state=42, n_init="auto")
+# Evaluar Silhouette Score para distintos k
+best_k = 2
+best_score = -1
+scores = []
+K_range = range(2, 11)
+
+for k in K_range:
+    kmeans = KMeans(n_clusters=k, random_state=42, n_init="auto")
+    labels = kmeans.fit_predict(X)
+    score = silhouette_score(X, labels)
+    scores.append(score)
+    if score > best_score:
+        best_score = score
+        best_k = k
+
+# Mostrar gráfica de scores
+plt.plot(K_range, scores, marker='o')
+plt.xlabel("Número de Clusters (k)")
+plt.ylabel("Silhouette Score")
+plt.title("Selección automática de k con Silhouette")
+plt.grid(True)
+plt.show()
+
+# Usar el mejor k encontrado
+print(f"\nMejor número de clusters según Silhouette Score: {best_k}")
+kmeans = KMeans(n_clusters=best_k, random_state=42, n_init="auto")
 df_clientes['Cluster'] = kmeans.fit_predict(X)
 
-# Crear resumen por cluster con promedios
+# Resumen por cluster
 cluster_summary = df_clientes.groupby('Cluster')[[
     'Total Ventas USD', 'Total Cajas', 'Productos Diferentes',
     'Categorías Diferentes', 'Meses Diferentes'
 ]].mean().round(2)
 
-# Contar cuántos clientes hay por cluster
-cluster_counts = df_clientes['Cluster'].value_counts().sort_index()
-
-# Agregar conteo de clientes al resumen
-cluster_summary['Número de Clientes'] = cluster_counts.reindex(cluster_summary.index, fill_value=0)
+# Tamaño de cada cluster
+cluster_summary['Número de Clientes'] = df_clientes['Cluster'].value_counts().sort_index()
 
 # Mostrar resumen
-print("Resumen por Cluster:")
+print("\nResumen por Cluster:")
 print(cluster_summary)
-
-# Guardar resultados a CSV solo si se desea
-guardar_csv = False  # Cambia a True si quieres guardar los archivos
-
-if guardar_csv:
-    df_clientes.to_csv("clientes_segmentados.csv", index=False)
-    cluster_summary.to_csv("resumen_clusters.csv")
