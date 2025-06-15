@@ -1,15 +1,15 @@
 # Importar librerías
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-import matplotlib.pyplot as plt
+from kneed import KneeLocator
 
-# Cargar archivo
-csv_path = "./Data/1. Ventas 2022 ENE-MAR.csv"
+# Cargar el archivo CSV
+csv_path = "./Data/1. Ventas 2023 ENE.csv"
 df = pd.read_csv(csv_path, encoding="latin1")
 
-# Agrupar por cliente
+# Agrupar por cliente con métricas relevantes
 df_clientes = df.groupby('ID Cliente').agg({
     'Venta USD': 'sum',
     'Venta Cajas': 'sum',
@@ -27,32 +27,31 @@ features = df_clientes.drop('ID Cliente', axis=1)
 scaler = StandardScaler()
 X = scaler.fit_transform(features)
 
-# Evaluar Silhouette Score para distintos k
-best_k = 2
-best_score = -1
-scores = []
-K_range = range(2, 11)
+# ---------- MÉTODO DEL CODO + KNEED ----------
+inertias = []
+K_range = range(1, 11)
 
 for k in K_range:
     kmeans = KMeans(n_clusters=k, random_state=42, n_init="auto")
-    labels = kmeans.fit_predict(X)
-    score = silhouette_score(X, labels)
-    scores.append(score)
-    if score > best_score:
-        best_score = score
-        best_k = k
+    kmeans.fit(X)
+    inertias.append(kmeans.inertia_)
 
-# Mostrar gráfica de scores
-plt.plot(K_range, scores, marker='o')
+# Encontrar el "codo" automáticamente
+kl = KneeLocator(K_range, inertias, curve="convex", direction="decreasing")
+k_optimo = kl.elbow
+print(f"\nNúmero óptimo de clusters según Kneedle: {k_optimo}")
+
+# Graficar curva del codo con el punto marcado
+plt.plot(K_range, inertias, marker='o')
+plt.vlines(k_optimo, plt.ylim()[0], plt.ylim()[1], linestyles='dashed', colors='red')
 plt.xlabel("Número de Clusters (k)")
-plt.ylabel("Silhouette Score")
-plt.title("Selección automática de k con Silhouette")
+plt.ylabel("Inercia (Within-Cluster SSE)")
+plt.title("Método del Codo para Selección Automática de k")
 plt.grid(True)
 plt.show()
 
-# Usar el mejor k encontrado
-print(f"\nMejor número de clusters según Silhouette Score: {best_k}")
-kmeans = KMeans(n_clusters=best_k, random_state=42, n_init="auto")
+# ---------- CLUSTERING CON K ÓPTIMO ----------
+kmeans = KMeans(n_clusters=k_optimo, random_state=42, n_init="auto")
 df_clientes['Cluster'] = kmeans.fit_predict(X)
 
 # Resumen por cluster
@@ -62,8 +61,15 @@ cluster_summary = df_clientes.groupby('Cluster')[[
 ]].mean().round(2)
 
 # Tamaño de cada cluster
-cluster_summary['Número de Clientes'] = df_clientes['Cluster'].value_counts().sort_index()
+cluster_counts = df_clientes['Cluster'].value_counts().sort_index()
+cluster_summary['Número de Clientes'] = cluster_counts.reindex(cluster_summary.index, fill_value=0)
 
 # Mostrar resumen
 print("\nResumen por Cluster:")
 print(cluster_summary)
+
+# Guardar archivos opcionalmente
+guardar_csv = False
+if guardar_csv:
+    df_clientes.to_csv("clientes_segmentados.csv", index=False)
+    cluster_summary.to_csv("resumen_clusters.csv")
