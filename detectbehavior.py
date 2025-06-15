@@ -6,7 +6,7 @@ from sklearn.cluster import KMeans
 from kneed import KneeLocator
 
 # Cargar el archivo CSV
-csv_path = "./Data/1. Ventas 2023 ENE.csv"
+csv_path = "./Data/Venta 2022 OCT - DIC V3.csv"
 df = pd.read_csv(csv_path, encoding="latin1")
 
 # Agrupar por cliente con métricas relevantes
@@ -69,7 +69,7 @@ print("\nResumen por Cluster:")
 print(cluster_summary)
 
 # Guardar archivos opcionalmente
-guardar_csv = False
+guardar_csv = True  # Cambiar a False si no se desea guardar
+# csv_path = "./Data/1. Ventas 2023 ENE/"
 if guardar_csv:
-    df_clientes.to_csv("clientes_segmentados.csv", index=False)
-    cluster_summary.to_csv("resumen_clusters.csv")
+    cluster_summary.to_csv(csv_path + " resumen_clusters.csv")
